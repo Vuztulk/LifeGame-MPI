@@ -174,9 +174,6 @@ void printWorld(unsigned short** current, unsigned short** next, SDL_Renderer* r
     
     SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
 	SDL_RenderClear(renderer);
-    //printf("Iteracion: %d\n",iteration);
-    //printMatriz(*current,worldWidth,worldHeight);
-    //printMatriz(*next,worldWidth,worldHeight);
 
     pintaWorld(*current, renderer, 0, worldHeight - 1, worldWidth);
 
@@ -187,13 +184,10 @@ void printWorld(unsigned short** current, unsigned short** next, SDL_Renderer* r
     *current = *next;
     *next = temp;
     
-    if (autoMode == 1) { // Auto mode
-        //SDL_Delay(80);
-    } else { // Step mode
+    if (!autoMode == 1) { // Step mode
         printf("Presione cualquier tecla para continuar...\n");
         char ch = getchar();
     }
-
 }
 
 void initWorld(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int worldHeight, unsigned short** currentWorld, unsigned short** newWorld, int autoMode) {
