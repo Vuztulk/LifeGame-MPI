@@ -10,10 +10,6 @@ void masterLogic(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int
 
     initWorld(window, renderer, worldWidth, worldHeight, &currentWorld, &newWorld, autoMode);
 
-    int* rowsPerProcess = (int*)malloc(n_proc * sizeof(int));
-    int* desplazamiento = (int*)malloc(n_proc * sizeof(int));
-    int rowsPerWorker = modeStatic ? worldHeight / (n_proc - 1) : grainSize;
-
     for (int iteration = 0; iteration < totalIterations; iteration++) {
         
         final = iteration >= totalIterations - 1 ? 1 : 0;
@@ -24,8 +20,8 @@ void masterLogic(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int
             cargaDinamica(n_proc, grainSize, currentWorld,newWorld, worldWidth, worldHeight, final);
         } 
         else {
-            cargaEstatica(n_proc, remaining, currentRow, worldHeight, currentWorld, rowsPerProcess, desplazamiento, worldWidth);
-            recibeEstatica(n_proc, desplazamiento, rowsPerProcess, newWorld, worldWidth, final);
+            cargaEstatica(n_proc, remaining, currentRow, worldHeight, currentWorld, worldWidth);
+            recibeEstatica(n_proc, newWorld, worldWidth, final);
         }
         printWorld(&currentWorld, &newWorld, renderer, worldHeight, worldWidth, autoMode, iteration, window);
     }
@@ -34,100 +30,99 @@ void masterLogic(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int
 
     free(currentWorld);
     free(newWorld);
-    free(rowsPerProcess);
-    free(desplazamiento);
 }
 
-void cargaEstatica(int n_proc, int remaining, int currentRow, int worldHeight, unsigned short* currentWorld, int* rowsPerProcess, int* desplazamiento, int worldWidth) {
+void cargaEstatica(int n_proc, int remaining, int currentRow, int worldHeight, unsigned short* currentWorld, int worldWidth) {
     
     int extra = worldHeight % (n_proc - 1); // Calcula el excedente
+    int desplazamiento, rowsPerProcess;
 
     for (int i = 1; i < n_proc; i++) {
-        rowsPerProcess[i] = worldHeight / (n_proc - 1);
+        rowsPerProcess = worldHeight / (n_proc - 1);
         if (extra > 0) { // Si hay excedente, añade una fila extra a este proceso
-            rowsPerProcess[i]++;
+            rowsPerProcess++;
             extra--;
         }
-        desplazamiento[i] = currentRow * worldWidth;
-        remaining -= rowsPerProcess[i];
-        currentRow += rowsPerProcess[i];
+        desplazamiento = currentRow * worldWidth;
+        remaining -= rowsPerProcess;
+        currentRow += rowsPerProcess;
 
-        int topIndex = (desplazamiento[i] - worldWidth < 0) ? worldHeight * worldWidth - worldWidth : desplazamiento[i] - worldWidth;
-        int bottomIndex = (desplazamiento[i] + rowsPerProcess[i] * worldWidth >= worldHeight * worldWidth) ? 0 : desplazamiento[i] + rowsPerProcess[i] * worldWidth;
+        int topIndex = (desplazamiento - worldWidth < 0) ? worldHeight * worldWidth - worldWidth : desplazamiento - worldWidth;
+        int bottomIndex = (desplazamiento + rowsPerProcess * worldWidth >= worldHeight * worldWidth) ? 0 : desplazamiento + rowsPerProcess * worldWidth;
 
         unsigned short* top = currentWorld + topIndex;
-        unsigned short* area = currentWorld + desplazamiento[i];
+        unsigned short* area = currentWorld + desplazamiento;
         unsigned short* bottom = currentWorld + bottomIndex;
 
-        MPI_Send(&desplazamiento[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-        MPI_Send(&rowsPerProcess[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+        MPI_Send(&desplazamiento, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+        MPI_Send(&rowsPerProcess, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
 
         MPI_Send(top, worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
-        MPI_Send(area, rowsPerProcess[i] * worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
+        MPI_Send(area, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
         MPI_Send(bottom, worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
     }
 }
 
 
-void recibeEstatica(int n_proc, int* desplazamiento, int* rowsPerProcess, unsigned short* newWorld, int worldWidth, int final) {
-    
+void recibeEstatica(int n_proc, unsigned short* newWorld, int worldWidth, int final) {
+    int received_proc, desplazamiento, rowsPerProcess;
+    MPI_Status status;
+
     for (int i = 1; i < n_proc; i++) {
-        MPI_Recv(&desplazamiento[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Recv(&rowsPerProcess[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        unsigned short* tempWorld = (unsigned short*) malloc(rowsPerProcess[i] * worldWidth * sizeof(unsigned short));
-        MPI_Recv(tempWorld, rowsPerProcess[i] * worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(&desplazamiento, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+        received_proc = status.MPI_SOURCE;
 
-        MPI_Send(&final, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+        MPI_Recv(&rowsPerProcess, 1, MPI_INT, received_proc, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        memcpy(newWorld + desplazamiento[i], tempWorld, rowsPerProcess[i] * worldWidth * sizeof(unsigned short));
+        unsigned short* tempWorld = (unsigned short*) malloc(rowsPerProcess * worldWidth * sizeof(unsigned short));
+        MPI_Recv(tempWorld, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, received_proc, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        MPI_Send(&final, 1, MPI_INT, received_proc, 0, MPI_COMM_WORLD);
+
+        memcpy(newWorld + desplazamiento, tempWorld, rowsPerProcess * worldWidth * sizeof(unsigned short));
         free(tempWorld);
     }
 }
 
+
 void cargaDinamica(int n_proc, int grainSize, unsigned short* currentWorld, unsigned short* newWorld, int worldWidth, int worldHeight, int final) {
     
-    int worker_finished, remaining = worldHeight, currentRow = 0, last_worker = -1, acabar = 0;
+    int worker_finished, remaining = worldHeight, currentRow = 0, acabar = 0;
+    int desplazamiento, rowsPerProcess;
     MPI_Status status;
 
-    int* rowsPerProcess = (int*)malloc(n_proc * sizeof(int));
-    int* desplazamiento = (int*)malloc(n_proc * sizeof(int));
     int* processed = (int*)malloc(n_proc * sizeof(int));
     memset(processed, 1, n_proc * sizeof(int));
     
     // Distribucion inicial
     for (int i = 1; i < n_proc && remaining > 0; i++) {
-        rowsPerProcess[i] = grainSize < remaining ? grainSize : remaining;
-        desplazamiento[i] = currentRow * worldWidth;
-        remaining -= rowsPerProcess[i];
-        currentRow += rowsPerProcess[i];
+        rowsPerProcess = grainSize < remaining ? grainSize : remaining;
+        desplazamiento = currentRow * worldWidth;
+        remaining -= rowsPerProcess;
+        currentRow += rowsPerProcess;
         
         sendDinamica(i, rowsPerProcess, desplazamiento, currentWorld, worldWidth, worldHeight);
         processed[i] = 0; // No ha sido procesado aun
     }
     
     while (remaining > 0 || !allProcessed(processed, n_proc)) {
-        MPI_Recv(&worker_finished, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        last_worker = status.MPI_SOURCE;
-        processed[last_worker] = 1;
 
         acabar = (final == 1) && (remaining == 0) ? 1 : 0;
 
-        recibeDinamica(last_worker, desplazamiento, rowsPerProcess, newWorld, worldWidth, acabar);
+        int worker = recibeDinamica(newWorld, worldWidth, acabar, processed);
 
         if (remaining > 0) {
-            rowsPerProcess[last_worker] = grainSize < remaining ? grainSize : remaining;
-            desplazamiento[last_worker] = currentRow * worldWidth;
-            remaining -= rowsPerProcess[last_worker];
-            currentRow += rowsPerProcess[last_worker];
+            rowsPerProcess = grainSize < remaining ? grainSize : remaining;
+            desplazamiento = currentRow * worldWidth;
+            remaining -= rowsPerProcess;
+            currentRow += rowsPerProcess;
 
-            sendDinamica(last_worker, rowsPerProcess, desplazamiento, currentWorld, worldWidth, worldHeight);
-            processed[last_worker] = 0;
+            sendDinamica(worker, rowsPerProcess, desplazamiento, currentWorld, worldWidth, worldHeight);
+            processed[worker] = 0;
         }
     }
     
-    free(rowsPerProcess);
-    free(desplazamiento);
     free(processed);
 }
 
@@ -143,35 +138,40 @@ int allProcessed(int* processed, int n_proc) {
     return allDone;
 }
 
-void sendDinamica(int i, int* rowsPerProcess, int* desplazamiento, unsigned short* currentWorld, int worldWidth, int worldHeight) {
+void sendDinamica(int i, int rowsPerProcess, int desplazamiento, unsigned short* currentWorld, int worldWidth, int worldHeight) {
 
-    int topIndex = (desplazamiento[i] - worldWidth < 0) ? worldHeight * worldWidth - worldWidth : desplazamiento[i] - worldWidth;
-    int bottomIndex = (desplazamiento[i] + rowsPerProcess[i] * worldWidth >= worldHeight * worldWidth) ? 0 : desplazamiento[i] + rowsPerProcess[i] * worldWidth;
+    int topIndex = (desplazamiento - worldWidth < 0) ? worldHeight * worldWidth - worldWidth : desplazamiento - worldWidth;
+    int bottomIndex = (desplazamiento + rowsPerProcess * worldWidth >= worldHeight * worldWidth) ? 0 : desplazamiento + rowsPerProcess * worldWidth;
 
     unsigned short* top = currentWorld + topIndex;
-    unsigned short* area = currentWorld + desplazamiento[i];
+    unsigned short* area = currentWorld + desplazamiento;
     unsigned short* bottom = currentWorld + bottomIndex;
 
-    MPI_Send(&desplazamiento[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-    MPI_Send(&rowsPerProcess[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+    MPI_Send(&desplazamiento, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+    MPI_Send(&rowsPerProcess, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
     MPI_Send(top, worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
-    MPI_Send(area, rowsPerProcess[i] * worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
+    MPI_Send(area, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
     MPI_Send(bottom, worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
 }
 
-void recibeDinamica(int i, int* desplazamiento, int* rowsPerProcess, unsigned short* newWorld, int worldWidth, int final) {
-    
-    MPI_Recv(&desplazamiento[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&rowsPerProcess[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+int recibeDinamica(unsigned short* newWorld, int worldWidth, int final, int * processed) {
+    int desplazamiento, rowsPerProcess;
+    MPI_Status status;
 
-    unsigned short* tempWorld = (unsigned short*) malloc(rowsPerProcess[i] * worldWidth * sizeof(unsigned short));
-    MPI_Recv(tempWorld, rowsPerProcess[i] * worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(&desplazamiento, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+    int worker = status.MPI_SOURCE;
+    MPI_Recv(&rowsPerProcess, 1, MPI_INT, worker, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    MPI_Send(&final, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+    unsigned short* tempWorld = (unsigned short*) malloc(rowsPerProcess * worldWidth * sizeof(unsigned short));
+    MPI_Recv(tempWorld, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, worker, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    memcpy(newWorld + desplazamiento[i], tempWorld, rowsPerProcess[i] * worldWidth * sizeof(unsigned short));
+    MPI_Send(&final, 1, MPI_INT, worker, 0, MPI_COMM_WORLD);
+
+    memcpy(newWorld + desplazamiento, tempWorld, rowsPerProcess * worldWidth * sizeof(unsigned short));
     free(tempWorld);
-    
+    processed[worker] = 1;
+
+    return worker;
 }
 
 void printWorld(unsigned short** current, unsigned short** next, SDL_Renderer* renderer, int worldHeight, int worldWidth, int autoMode, int iteration, SDL_Window* window) {
