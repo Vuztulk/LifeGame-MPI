@@ -16,7 +16,7 @@ void printWorld(unsigned short** current, unsigned short** next, SDL_Renderer* r
 
 void initWorld(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int worldHeight, unsigned short** currentWorld, unsigned short** newWorld, int autoMode);
 
-void cargaEstatica(int n_proc, int remaining, int currentRow, int worldHeight, unsigned short* newWorld, int worldWidth);
+void cargaEstatica(int n_proc, int currentRow, int worldHeight, unsigned short* currentWorld, int worldWidth);
 
 void recibeEstatica(int n_proc, unsigned short* newWorld, int worldWidth, int final);
 

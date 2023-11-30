@@ -20,7 +20,7 @@ void masterLogic(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int
             cargaDinamica(n_proc, grainSize, currentWorld,newWorld, worldWidth, worldHeight, final);
         } 
         else {
-            cargaEstatica(n_proc, remaining, currentRow, worldHeight, currentWorld, worldWidth);
+            cargaEstatica(n_proc, currentRow, worldHeight, currentWorld, worldWidth);
             recibeEstatica(n_proc, newWorld, worldWidth, final);
         }
         printWorld(&currentWorld, &newWorld, renderer, worldHeight, worldWidth, autoMode, iteration, window);
@@ -32,7 +32,7 @@ void masterLogic(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int
     free(newWorld);
 }
 
-void cargaEstatica(int n_proc, int remaining, int currentRow, int worldHeight, unsigned short* currentWorld, int worldWidth) {
+void cargaEstatica(int n_proc, int currentRow, int worldHeight, unsigned short* currentWorld, int worldWidth) {
     
     int extra = worldHeight % (n_proc - 1); // Calcula el excedente
     int desplazamiento, rowsPerProcess;
@@ -44,7 +44,6 @@ void cargaEstatica(int n_proc, int remaining, int currentRow, int worldHeight, u
             extra--;
         }
         desplazamiento = currentRow * worldWidth;
-        remaining -= rowsPerProcess;
         currentRow += rowsPerProcess;
 
         int topIndex = (desplazamiento - worldWidth < 0) ? worldHeight * worldWidth - worldWidth : desplazamiento - worldWidth;
@@ -65,20 +64,18 @@ void cargaEstatica(int n_proc, int remaining, int currentRow, int worldHeight, u
 
 
 void recibeEstatica(int n_proc, unsigned short* newWorld, int worldWidth, int final) {
-    int received_proc, desplazamiento, rowsPerProcess;
+    int worker, desplazamiento, rowsPerProcess;
     MPI_Status status;
 
     for (int i = 1; i < n_proc; i++) {
 
         MPI_Recv(&desplazamiento, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-        received_proc = status.MPI_SOURCE;
-
-        MPI_Recv(&rowsPerProcess, 1, MPI_INT, received_proc, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        worker = status.MPI_SOURCE;
+        MPI_Recv(&rowsPerProcess, 1, MPI_INT, worker, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         unsigned short* tempWorld = (unsigned short*) malloc(rowsPerProcess * worldWidth * sizeof(unsigned short));
-        MPI_Recv(tempWorld, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, received_proc, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-        MPI_Send(&final, 1, MPI_INT, received_proc, 0, MPI_COMM_WORLD);
+        MPI_Recv(tempWorld, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, worker, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(&final, 1, MPI_INT, worker, 0, MPI_COMM_WORLD);
 
         memcpy(newWorld + desplazamiento, tempWorld, rowsPerProcess * worldWidth * sizeof(unsigned short));
         free(tempWorld);
@@ -88,8 +85,7 @@ void recibeEstatica(int n_proc, unsigned short* newWorld, int worldWidth, int fi
 
 void cargaDinamica(int n_proc, int grainSize, unsigned short* currentWorld, unsigned short* newWorld, int worldWidth, int worldHeight, int final) {
     
-    int worker_finished, remaining = worldHeight, currentRow = 0, acabar = 0;
-    int desplazamiento, rowsPerProcess;
+    int worker_finished, remaining = worldHeight, currentRow = 0, acabar = 0,desplazamiento, rowsPerProcess;
     MPI_Status status;
 
     int* processed = (int*)malloc(n_proc * sizeof(int));
