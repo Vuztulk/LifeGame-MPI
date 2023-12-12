@@ -28,6 +28,7 @@ void masterLogic(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int
 
     free(currentWorld);
     free(newWorld);
+    
 }
 
 void cargaEstatica(int n_proc, int worldHeight, int worldWidth,unsigned short* currentWorld, unsigned short* newWorld, int final) {
@@ -63,25 +64,24 @@ void cargaEstatica(int n_proc, int worldHeight, int worldWidth,unsigned short* c
         MPI_Send(bottom, worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
     }
     recibeEstatica(n_proc, newWorld, worldWidth, final);
+
 }
 
 void recibeEstatica(int n_proc, unsigned short* newWorld, int worldWidth, int final) {
-    int worker, desplazamiento, rowsPerProcess;
+
+    int desplazamiento, rowsPerProcess;
     MPI_Status status;
 
     for (int i = 1; i < n_proc; i++) {
 
         MPI_Recv(&desplazamiento, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-        worker = status.MPI_SOURCE;
-        MPI_Recv(&rowsPerProcess, 1, MPI_INT, worker, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(&rowsPerProcess, 1, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        unsigned short* tempWorld = (unsigned short*) malloc(rowsPerProcess * worldWidth * sizeof(unsigned short));
-        MPI_Recv(tempWorld, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, worker, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Send(&final, 1, MPI_INT, worker, 0, MPI_COMM_WORLD);
-
-        memcpy(newWorld + desplazamiento, tempWorld, rowsPerProcess * worldWidth * sizeof(unsigned short));
-        free(tempWorld);
+        MPI_Recv(newWorld + desplazamiento, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, status.MPI_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(&final, 1, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
+        
     }
+
 }
 
 void cargaDinamica(int n_proc, int grainSize, unsigned short* currentWorld, unsigned short* newWorld, int worldWidth, int worldHeight, int final) {
@@ -99,7 +99,7 @@ void cargaDinamica(int n_proc, int grainSize, unsigned short* currentWorld, unsi
         sendDinamica(i, rowsPerProcess, desplazamiento, currentWorld, worldWidth, worldHeight);
     }
     
-    while (enviar > 0 || recibir > 0) {
+    while (recibir > 0) {
 
         acabar = (final == 1) && (enviar == 0) ? 1 : 0;
 
@@ -114,6 +114,7 @@ void cargaDinamica(int n_proc, int grainSize, unsigned short* currentWorld, unsi
             sendDinamica(worker, rowsPerProcess, desplazamiento, currentWorld, worldWidth, worldHeight);
         }
     }
+
 }
 
 void sendDinamica(int i, int rowsPerProcess, int desplazamiento, unsigned short* currentWorld, int worldWidth, int worldHeight) {
@@ -130,26 +131,23 @@ void sendDinamica(int i, int rowsPerProcess, int desplazamiento, unsigned short*
     MPI_Send(top, worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
     MPI_Send(area, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
     MPI_Send(bottom, worldWidth, MPI_UNSIGNED_SHORT, i, 0, MPI_COMM_WORLD);
+
 }
 
 int recibeDinamica(unsigned short* newWorld, int worldWidth, int final, int* recibir) {
+
     int desplazamiento, rowsPerProcess;
     MPI_Status status;
 
     MPI_Recv(&desplazamiento, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-    int worker = status.MPI_SOURCE;
-    MPI_Recv(&rowsPerProcess, 1, MPI_INT, worker, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(&rowsPerProcess, 1, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     *recibir -= rowsPerProcess;
 
-    unsigned short* tempWorld = (unsigned short*) malloc(rowsPerProcess * worldWidth * sizeof(unsigned short));
-    MPI_Recv(tempWorld, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, worker, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(newWorld + desplazamiento, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, status.MPI_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Send(&final, 1, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
 
-    MPI_Send(&final, 1, MPI_INT, worker, 0, MPI_COMM_WORLD);
+    return status.MPI_SOURCE;
 
-    memcpy(newWorld + desplazamiento, tempWorld, rowsPerProcess * worldWidth * sizeof(unsigned short));
-    free(tempWorld);
-
-    return worker;
 }
 
 void printWorld(unsigned short** current, unsigned short** next, SDL_Renderer* renderer, int worldHeight, int worldWidth, int autoMode, int iteration, SDL_Window* window) {
@@ -170,6 +168,7 @@ void printWorld(unsigned short** current, unsigned short** next, SDL_Renderer* r
         printf("Presione cualquier tecla para continuar...\n");
         char ch = getchar();
     }
+
 }
 
 void initWorld(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int worldHeight, unsigned short** currentWorld, unsigned short** newWorld, int autoMode) {
