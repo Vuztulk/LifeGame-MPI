@@ -32,9 +32,11 @@ void workerLogic(int rank, int worldWidth, int worldHeight, int totalIterations,
     free(myWorld);
     free(bottom);
     free(newWorld);
+    
 }
 
 void calcular(unsigned short* top, unsigned short* myWorld, unsigned short* bottom, unsigned short* newWorld, int desplazamiento, int worldWidth) {
+    
     for (int row = 0; row < desplazamiento; row++) {
         for (int col = 0; col < worldWidth; col++) {
 
@@ -89,6 +91,7 @@ void calcular(unsigned short* top, unsigned short* myWorld, unsigned short* bott
             setCellAt(&c, newWorld, worldWidth, newCell);
         }
     }
+
 }
 
 

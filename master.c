@@ -28,7 +28,7 @@ void masterLogic(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int
 
     free(currentWorld);
     free(newWorld);
-    
+
 }
 
 void cargaEstatica(int n_proc, int worldHeight, int worldWidth,unsigned short* currentWorld, unsigned short* newWorld, int final) {
@@ -193,9 +193,11 @@ void initWorld(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int w
 }
 
 void checkCataclysm(unsigned short* myWorld, int worldWidth, int worldHeight, int iteration) {
+
     if (iteration % ITER_CATACLYSM == 1 && (rand() % 101 < PROB_CATACLYSM)) {
         for (int row = 0; row < worldHeight; row++) {
             myWorld[row * worldWidth] = myWorld[row * worldWidth + worldWidth - 1] = CELL_CATACLYSM;
         }
     }
+    
 }
