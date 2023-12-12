@@ -2,32 +2,28 @@
 
 void workerLogic(int rank, int worldWidth, int worldHeight, int totalIterations, int autoMode, int modeStatic, int grainSize, int n_proc) {
     
-    int start, desplazamiento, final = 0, worker_finished = 1;
+    int desplazamiento, rowsPerProcess, final = 0;
     MPI_Status status;
-    unsigned short* myWorld;
-    unsigned short* newWorld;
-    unsigned short* top;
-    unsigned short* bottom;
 
-    top = (unsigned short*)malloc(worldWidth * sizeof(unsigned short));
-    myWorld = (unsigned short*)malloc(worldHeight * worldWidth * sizeof(unsigned short));
-    bottom = (unsigned short*)malloc(worldWidth * sizeof(unsigned short));
-    newWorld = (unsigned short*)malloc(worldHeight * worldWidth * sizeof(unsigned short));
+    unsigned short* top = (unsigned short*)malloc(worldWidth * sizeof(unsigned short));
+    unsigned short* bottom = (unsigned short*)malloc(worldWidth * sizeof(unsigned short));
+    unsigned short* myWorld = (unsigned short*)malloc(worldHeight * worldWidth * sizeof(unsigned short));
+    unsigned short* newWorld = (unsigned short*)malloc(worldHeight * worldWidth * sizeof(unsigned short));
 
     while (!final) {
 
-        MPI_Recv(&start, 1, MPI_INT, MASTER, 0, MPI_COMM_WORLD, &status);
         MPI_Recv(&desplazamiento, 1, MPI_INT, MASTER, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(&rowsPerProcess, 1, MPI_INT, MASTER, 0, MPI_COMM_WORLD, &status);
 
         MPI_Recv(top, worldWidth, MPI_UNSIGNED_SHORT, MASTER, 0, MPI_COMM_WORLD, &status);
-        MPI_Recv(myWorld, desplazamiento * worldWidth, MPI_UNSIGNED_SHORT, MASTER, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(myWorld, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, MASTER, 0, MPI_COMM_WORLD, &status);
         MPI_Recv(bottom, worldWidth, MPI_UNSIGNED_SHORT, MASTER, 0, MPI_COMM_WORLD, &status);
 
-        calcular(top, myWorld, bottom, newWorld, desplazamiento, worldWidth); 
+        calcular(top, myWorld, bottom, newWorld, rowsPerProcess, worldWidth); 
 
-        MPI_Send(&start, 1, MPI_INT, MASTER, 0, MPI_COMM_WORLD);
         MPI_Send(&desplazamiento, 1, MPI_INT, MASTER, 0, MPI_COMM_WORLD);
-        MPI_Send(newWorld, desplazamiento * worldWidth, MPI_UNSIGNED_SHORT, MASTER, 0, MPI_COMM_WORLD);
+        MPI_Send(&rowsPerProcess, 1, MPI_INT, MASTER, 0, MPI_COMM_WORLD);
+        MPI_Send(newWorld, rowsPerProcess * worldWidth, MPI_UNSIGNED_SHORT, MASTER, 0, MPI_COMM_WORLD);
         
         MPI_Recv(&final, 1, MPI_INT, MASTER, 0, MPI_COMM_WORLD, &status);
     }
@@ -36,8 +32,6 @@ void workerLogic(int rank, int worldWidth, int worldHeight, int totalIterations,
     free(myWorld);
     free(bottom);
     free(newWorld);
-
-	MPI_Finalize();
 }
 
 void calcular(unsigned short* top, unsigned short* myWorld, unsigned short* bottom, unsigned short* newWorld, int desplazamiento, int worldWidth) {

@@ -16,13 +16,13 @@ void printWorld(unsigned short** current, unsigned short** next, SDL_Renderer* r
 
 void initWorld(SDL_Window* window, SDL_Renderer* renderer, int worldWidth, int worldHeight, unsigned short** currentWorld, unsigned short** newWorld, int autoMode);
 
-void cargaEstatica(int n_proc, int currentRow, int worldHeight, unsigned short* currentWorld, int worldWidth);
+void cargaEstatica(int n_proc, int worldHeight, int worldWidth,unsigned short* currentWorld, unsigned short* newWorld, int final);
 
 void recibeEstatica(int n_proc, unsigned short* newWorld, int worldWidth, int final);
 
 void cargaDinamica(int n_proc, int grainSize, unsigned short* currentWorld, unsigned short* newWorld, int worldWidth, int worldHeight, int final);
 
-int recibeDinamica(unsigned short* newWorld, int worldWidth, int final, int * processed);
+int recibeDinamica(unsigned short* newWorld, int worldWidth, int final, int* recibir);
 
 void sendDinamica(int i, int rowsPerProcess, int desplazamiento, unsigned short* currentWorld, int worldWidth, int worldHeight);
 

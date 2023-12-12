@@ -141,13 +141,12 @@ int main(int argc, char* argv[]){
 			// Set timer
 			endTime = MPI_Wtime();
 			printf ("Total execution time:%f seconds\n", endTime-startTime);
-			MPI_Finalize();
-	
 		}
 		else{
 			workerLogic(rank, worldWidth, worldHeight, totalIterations, autoMode, distModeStatic, grainSize, size);
 		}
-			
+
+	MPI_Finalize();
     return 0;
 }
 
