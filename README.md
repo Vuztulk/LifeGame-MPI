@@ -16,10 +16,3 @@ El Juego de la Vida es un autómata celular ideado por John Conway. Se trata de 
 
 - **MPI:** Se recomienda utilizar [OpenMPI](https://www.open-mpi.org/) o [MPICH](https://www.mpich.org/).
 - **Compilador C/C++:** Se requiere un compilador compatible (por ejemplo, `gcc` o `clang`).
-
-## Compilación
-
-Para compilar el proyecto, usa el siguiente comando en la terminal:
-
-```bash
-mpicc -o lifegame_mpi main.c
